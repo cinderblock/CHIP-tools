@@ -19,15 +19,17 @@ ADC=$(i2cget -y -f 0 0x34 0x82)
 # if couldn't perform get, then exit immediately
 [ $? -ne 0 ] && exit $?
 
-if [ "$(($ADC & 0xfe))" != "0xfe" ] ; then
+if [ "$(($ADC & 0xfe))" != "$((0xfe))" ] ; then
     i2cset -y -f 0 0x34 0x82 $(($ADC | 0xfe))
     # Need to wait at least 1/25s for the ADC to take a reading
     sleep 1
 fi
 
+REG_0x00_WORD=$(i2cget -y -f 0 0x34 0x00 w)
+
 ################################
 #read Power status register @00h
-POWER_STATUS=$(i2cget -y -f 0 0x34 0x00)
+POWER_STATUS=$(($REG_0x00_WORD & 0xff))
 
 echo -n "Battery current direction = "
 [ $(($POWER_STATUS & 0x04)) -ne 0 ] && echo "Charging" \
@@ -35,7 +37,7 @@ echo -n "Battery current direction = "
 
 ################################
 #read Power OPERATING MODE register @01h
-POWER_OP_MODE=$(i2cget -y -f 0 0x34 0x01)
+POWER_OP_MODE=$(($REG_0x00_WORD >> 8))
 
 echo -n "Charging indicator = "
 [ $(($POWER_OP_MODE & 0x40)) -ne 0 ] && echo "Charging" \
@@ -43,8 +45,9 @@ echo -n "Charging indicator = "
 
 ###################
 #read internal temperature 	5eh, 5fh	-144.7c -> 000h,	0.1c/bit	FFFh -> 264.8c
-TEMP_MSB=$(i2cget -y -f 0 0x34 0x5e)
-TEMP_LSB=$(i2cget -y -f 0 0x34 0x5f)
+REG_0x5E_WORD=$(i2cget -y -f 0 0x34 0x5e w)
+TEMP_MSB=$(($REG_0x5E_WORD & 0xff))
+TEMP_LSB=$(($REG_0x5E_WORD >> 8))
 
 TEMP_BIN=$(( ($TEMP_MSB << 4) | ($TEMP_LSB & 0x0F) ))
 
@@ -55,14 +58,16 @@ echo "Internal temperature = "$TEMP_C"c"
 #read ACIN information
 if [ $(($POWER_STATUS & 0x80)) -ne 0 ] ; then
     echo "ACIN present"
-    ACIN_VOLT_MSB=$(i2cget -y -f 0 0x34 0x56)
-    ACIN_VOLT_LSB=$(i2cget -y -f 0 0x34 0x57)
+    REG_0x56_WORD=$(i2cget -y -f 0 0x34 0x56 w)
+    ACIN_VOLT_MSB=$(($REG_0x56_WORD & 0xff))
+    ACIN_VOLT_LSB=$(($REG_0x56_WORD >> 8))
     ACIN_BIN=$(( ($ACIN_VOLT_MSB << 4) | ($ACIN_VOLT_LSB & 0x0F) ))
     ACIN_VOLT=$(echo "$ACIN_BIN*1.7"|bc)
     echo "  ACIN voltage = "$ACIN_VOLT"mV"
 
-    ACIN_I_MSB=$(i2cget -y -f 0 0x34 0x58)
-    ACIN_I_LSB=$(i2cget -y -f 0 0x34 0x59)
+    REG_0x58_WORD=$(i2cget -y -f 0 0x34 0x58 w)
+    ACIN_I_MSB=$(($REG_0x58_WORD & 0xff))
+    ACIN_I_LSB=$(($REG_0x58_WORD >> 8))
     ACIN_I_BIN=$(( ($ACIN_I_MSB << 4) | ($ACIN_I_LSB & 0x0F) ))
     ACIN_I=$(echo "$ACIN_I_BIN*0.625"|bc)
     echo "  ACIN current = "$ACIN_I"mA"
@@ -74,14 +79,16 @@ fi
 #read VBUS information
 if [ $(($POWER_STATUS & 0x20)) -ne 0 ] ; then
     echo "VBUS present"
-    VBIN_VOLT_MSB=$(i2cget -y -f 0 0x34 0x5a)
-    VBIN_VOLT_LSB=$(i2cget -y -f 0 0x34 0x5b)
+    REG_0x5A_WORD=$(i2cget -y -f 0 0x34 0x5a w)
+    VBIN_VOLT_MSB=$(($REG_0x5A_WORD & 0xff))
+    VBIN_VOLT_LSB=$(($REG_0x5A_WORD >> 8))
     VBIN_BIN=$(( ($VBIN_VOLT_MSB << 4) | ($VBIN_VOLT_LSB & 0x0F) ))
     VBIN_VOLT=$(echo "$VBIN_BIN*1.7"|bc)
     echo "  VBUS voltage = "$VBIN_VOLT"mV"
 
-    VBIN_I_MSB=$(i2cget -y -f 0 0x34 0x5c)
-    VBIN_I_LSB=$(i2cget -y -f 0 0x34 0x5d)
+    REG_0x5C_WORD=$(i2cget -y -f 0 0x34 0x5c w)
+    VBIN_I_MSB=$(($REG_0x5C_WORD & 0xff))
+    VBIN_I_LSB=$(($REG_0x5C_WORD >> 8))
     VBIN_I_BIN=$(( ($VBIN_I_MSB << 4) | ($VBIN_I_LSB & 0x0F) ))
     VBIN_I=$(echo "$VBIN_I_BIN*0.375"|bc)
     echo "  VBUS current = "$VBIN_I"mA"
@@ -140,8 +147,9 @@ if [ $(($POWER_OP_MODE & 0x20)) -ne 0 ] ; then
     echo "Battery present"
     ################################
     #read battery voltage	79h, 78h	0 mV -> 000h,	1.1 mV/bit	FFFh -> 4.5045 V
-    BAT_VOLT_MSB=$(i2cget -y -f 0 0x34 0x78)
-    BAT_VOLT_LSB=$(i2cget -y -f 0 0x34 0x79)
+    REG_0x78_WORD=$(i2cget -y -f 0 0x34 0x78 w)
+    BAT_VOLT_MSB=$(($REG_0x78_WORD & 0xff))
+    BAT_VOLT_LSB=$(($REG_0x78_WORD >> 8))
 
     BAT_BIN=$(( ($BAT_VOLT_MSB << 4) | ($BAT_VOLT_LSB & 0x0F) ))
     BAT_VOLT=$(echo "$BAT_BIN*1.1"|bc)
@@ -150,8 +158,9 @@ if [ $(($POWER_OP_MODE & 0x20)) -ne 0 ] ; then
     ###################
     #read Battery Discharge Current	7Ch, 7Dh	0 mV -> 000h,	0.5 mA/bit	1FFFh -> 1800 mA
     #13 bits
-    BAT_IDISCHG_MSB=$(i2cget -y -f 0 0x34 0x7C)
-    BAT_IDISCHG_LSB=$(i2cget -y -f 0 0x34 0x7D)
+    REG_0x7C_WORD=$(i2cget -y -f 0 0x34 0x7C w)
+    BAT_IDISCHG_MSB=$(($REG_0x7C_WORD & 0xff))
+    BAT_IDISCHG_LSB=$(($REG_0x7C_WORD >> 8))
 
     BAT_IDISCHG_BIN=$(( ($BAT_IDISCHG_MSB << 5) | ($BAT_IDISCHG_LSB & 0x1F) ))
     BAT_IDISCHG=$(echo "($BAT_IDISCHG_BIN*0.5)"|bc)
@@ -160,8 +169,9 @@ if [ $(($POWER_OP_MODE & 0x20)) -ne 0 ] ; then
     ###################
     #read Battery Charge Current	7Ah, 7Bh	0 mV -> 000h,	0.5 mA/bit	FFFh -> 1800 mA
     #(12 bits)
-    BAT_ICHG_MSB=$(i2cget -y -f 0 0x34 0x7A)
-    BAT_ICHG_LSB=$(i2cget -y -f 0 0x34 0x7B)
+    REG_0x7A_WORD=$(i2cget -y -f 0 0x34 0x7A w)
+    BAT_ICHG_MSB=$(($REG_0x7A_WORD & 0xff))
+    BAT_ICHG_LSB=$(($REG_0x7A_WORD >> 8))
 
     BAT_ICHG_BIN=$(( ($BAT_ICHG_MSB << 4) | ($BAT_ICHG_LSB & 0x0F) ))
     BAT_ICHG=$(echo "$BAT_ICHG_BIN*0.5"|bc)
